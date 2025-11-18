@@ -19,7 +19,7 @@ import org.apache.http.util.EntityUtils;
 import org.json.JSONObject;
 
 /** This class deals with getting/maintaining a bearer token from Twitch's API **/
-public class TokenManager {
+public class TokenManager extends FileWriter {
 	private final CloseableHttpClient httpclient = HttpClientSingleton.HTTPCLIENT;
 
 	private final Path filePath;
@@ -31,6 +31,7 @@ public class TokenManager {
 	private final String ENDPOINT = "https://id.twitch.tv/oauth2/";
 
 	public TokenManager(String fileName, ClientInfo clientInfo) {
+		super(fileName);
 		this.filePath = Path.of(fileName);
 		this.clientInfo = clientInfo;
 		loadTokens();
@@ -38,6 +39,7 @@ public class TokenManager {
 	}
 	
 	public TokenManager(String fileName, ClientInfo clientInfo, String bearerToken, Long expiresIn) {
+		super(fileName);
 		this.filePath = Path.of(fileName);
 		this.clientInfo = clientInfo;
 		setTokens(bearerToken, expiresIn);
@@ -48,20 +50,16 @@ public class TokenManager {
 		this.bearerToken = newBearer;
 		this.expiresIn = newExpiresIn;
 
-		try {
-			String content = String.join("\n", bearerToken, String.valueOf(expiresIn));
-			Files.writeString(filePath, content, StandardOpenOption.CREATE,
-					StandardOpenOption.TRUNCATE_EXISTING);
-		} catch (IOException e) {
-			System.err.println("Error writing token file: " + e.getMessage());
-		}
+		String content = String.join("\n", bearerToken, String.valueOf(expiresIn));
+		super.writeToFile(content);
 	}
 	
 	private void readTokenFile() throws IOException {
-		List<String> lines = Files.readAllLines(filePath);
-		if (lines.size() >= 2) {
-			this.bearerToken = lines.get(0);
-			this.expiresIn = Long.parseLong(lines.get(1));
+		List<String> content = super.readFromFile();
+		
+		if (content.size() >= 2) {
+			this.bearerToken = content.get(0);
+			this.expiresIn = Long.parseLong(content.get(1));
 		} else {
 			this.bearerToken = "";
 			this.expiresIn = (long) -1;
@@ -85,6 +83,10 @@ public class TokenManager {
 	private boolean isTokenValid() {
 		try {
 			if(this.isClientInformationBlank()) {
+				return false;
+			}
+			
+			if(expiresIn == null) {
 				return false;
 			}
 			

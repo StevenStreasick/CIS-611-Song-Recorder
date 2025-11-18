@@ -8,11 +8,21 @@ import org.java_websocket.handshake.ServerHandshake;
 public class WebClient extends WebSocketClient {
 
 
-	protected final ClientInfo clientInfo = new ClientInfo();
+	protected final ClientInfo clientInfo;
 	private final TokenManager tokenManager;
 
 	public WebClient(URI serverUri, String tokenFileName) {
 		super(serverUri);
+		
+		clientInfo = new ClientInfo();
+		
+		this.tokenManager = new TokenManager(tokenFileName, clientInfo);
+	}
+	
+	public WebClient(URI serverUri, String tokenFileName, ClientInfo clientInfo) {
+		super(serverUri);
+		
+		this.clientInfo = clientInfo;
 		
 		this.tokenManager = new TokenManager(tokenFileName, clientInfo);
 	}
@@ -21,11 +31,13 @@ public class WebClient extends WebSocketClient {
 		tokenManager.updateTokens();
 		return tokenManager.getBearerToken();
 	}
+	
+	protected void updateURI(URI newUri) throws Exception {
+	    this.close();
+	    this.uri = newUri; // Access the protected 'uri' field from WebSocketClient
+	    this.connectBlocking();
+	}
 
-	
-	
-	
-	
 	@Override
 	public void onOpen(ServerHandshake handshakedata) {
 		// TODO Auto-generated method stub

@@ -2,81 +2,63 @@ package songs;
 
 import java.net.URISyntaxException;
 
-public class Main implements MainInterface {
+public class Main implements StreamObserver {
 	
-//	private static final String streamerName = "a_couple_streams";
-	private static final String streamerName = "PeteZahHutt";
+	private static final String streamerName = "CERIANMusic";
 
-	private static final String clientId = "1234";
+	String clientId = System.getenv("TWITCH_CLIENT_ID");
+	String clientSecret = System.getenv("TWITCH_CLIENT_SECRET");
 	
-	private static boolean listenForStreamEvents() {
+	private TwitchAPI twitchAPI;
+	private StreamerSonglistAPI songlistAPI;
+	
+	public Main() {
 		try {
-			TwitchAPI twitchAPI = new TwitchAPI(streamerName);
-			twitchAPI.setClientId(clientId);
-	
-			StreamerSonglistAPI songlistAPI = new StreamerSonglistAPI(streamerName);
+			twitchAPI = new TwitchAPI(streamerName);
 			
-			if(!twitchAPI.isStreamerLive()) {
-				
-				twitchAPI.listenForStreamStart();
-				
-			} else {
-				//Streamer is currently live.
-				String startTime = twitchAPI.getStartTime();
-				boolean setStartTimeSuccess = songlistAPI.setStartTime(startTime);
-				
-				if(!setStartTimeSuccess) {
-					throw new Exception("Unable to set the songlist start time");
-				}
-			}
+			twitchAPI.clientInfo.setClientId(clientId);
+			twitchAPI.clientInfo.setClientSecret(clientSecret);
 			
-			twitchAPI.listenForStreamEnd();
-			
-			return true;
+			System.out.println("Adding as observer");
+			twitchAPI.addObserver(this);
 			
 		} catch(Exception e) {
-			e.printStackTrace();
+			
 		}
-		
-		return false;
+	}
+
+	@Override
+	public void onStreamStart(String startTime) {
+		System.out.println("Stream is starting at " + startTime);
+		songlistAPI = new StreamerSonglistAPI(streamerName);
+		songlistAPI.setStartTime(startTime);
 	}
 	
-	public static void main(String[] args) {
-		
+	@Override
+	public void onStreamEnd() {
+		//Do stuff here to handle a 'restart'
 		try {
-//			TwitchAPI twitchAPI = new TwitchAPI("wss://eventsub.wss.twitch.tv/ws");
-			
-			//TokenManager(String fileName)
-			System.out.println(System.getProperty("user.dir"));
-			TokenManager manager = new TokenManager("tokens.txt");
-			System.out.println(manager.getBearerToken());
+			songlistAPI.writeSonglistToFile();
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
 //		listenForStreamEvents();
-//		
-//		//The idea here is that I want to 'freeze' the main thread to prevent program termination and allow the 
-//		// events (streamStarted/streamEnded) to handle changes.
-//		while(true) {
-//			try {
-//				Thread.sleep(Long.MAX_VALUE);
-//			} catch(InterruptedException e) {
-//				
-//			}
-//		}
-
 	}
+	
+	public static void main(String[] args) {
+		try {
+			Main main = new Main();
+			
+//			TokenManager manager = new TokenManager("tokens.txt");
 
-	public static void StreamWentLive() {
-		// TODO: Fill out this method
-		
-	}
-
-	public static void StreamEnded() {
-		//Do stuff here to handle a 'restart'
-		
-		listenForStreamEvents();
+			
+			//TokenManager(String fileName)
+	        Thread.currentThread().join(); // Wait indefinitely
+			
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 }

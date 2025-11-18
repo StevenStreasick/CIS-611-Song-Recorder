@@ -10,11 +10,22 @@ import java.util.List;
 abstract class FileWriter {
 	Path filePath;
 
+	public FileWriter() {
+	}
+	
 	public FileWriter(String fileName) {
-		filePath = Path.of(fileName);
+		this.setPath(fileName);
+	}
+	
+	public FileWriter(Path filePath) {
+		this.setPath(filePath);
 	}
 	
 	public boolean writeToFile(String data) {
+		if(filePath == null) {
+			return false;
+		}
+		
 		try {
 			Files.writeString(filePath, data, StandardOpenOption.CREATE,
 					StandardOpenOption.TRUNCATE_EXISTING);
@@ -24,15 +35,28 @@ abstract class FileWriter {
 			return false;
 		}
 	}
-	
-	public String readFromFile() {
+	// TODO: Improve this class by returning a list<String>	
+	public List<String> readFromFile() {
+		if(filePath == null) {
+			return null;
+		}
 		try {
 			List<String> lines = Files.readAllLines(filePath);
-			return lines.isEmpty() ? "" : lines.get(0); // Assuming token is on the first line
+			return lines; 
 		} catch (IOException e) {
 			System.err.println("Error reading from file: " + e.getMessage());
 			return null;
 		}
+	}
+	
+	public boolean setPath(Path filePath) {
+		this.filePath = filePath;
+		return true;
+	}
+	
+	public boolean setPath(String fileName) {
+		this.filePath = Path.of(fileName);
+		return true;
 	}
 
 

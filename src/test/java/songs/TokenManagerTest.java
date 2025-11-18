@@ -1,16 +1,20 @@
 package songs;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.FileWriter;
-
+import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Scanner;
 
 public class TokenManagerTest {
+//	TODO: Add a test for File Writer extends...
+	String fileName = "\tokens.txt";
 	
 	String clientId = System.getenv("TWITCH_CLIENT_ID");
 	String clientSecret = System.getenv("TWITCH_CLIENT_SECRET");
@@ -19,6 +23,15 @@ public class TokenManagerTest {
 	ClientInfo clientInfo = new ClientInfo(clientId, clientSecret);
 
 	static ClientInfo testingInfo = new ClientInfo(System.getenv("TWITCH_CLIENT_ID"), System.getenv("TWITCH_CLIENT_SECRET"));
+	
+	@BeforeEach
+	void removeTokenFile() {
+		File file = new File(fileName);
+
+        if (file.exists()) {
+        	file.delete();
+        }
+	}
 	
 	@Test 
 	void environmentVariables() {
@@ -31,7 +44,7 @@ public class TokenManagerTest {
     @Test
     void Constructor1() {
     	
-        TokenManager manager = new TokenManager("\tokens.txt", clientInfo);
+        TokenManager manager = new TokenManager(fileName, clientInfo);
         
         String token = manager.getBearerToken();
 
@@ -41,8 +54,7 @@ public class TokenManagerTest {
     }
     
     @Test
-    void wrtieToFile() {
-    	String fileName = "\tokens.txt";
+    void writeToFile() {
         TokenManager manager = new TokenManager(fileName, clientInfo);
         
         String token = manager.getBearerToken();
@@ -120,9 +132,5 @@ public class TokenManagerTest {
         String newToken = manager.getBearerToken();
         assertNotEquals(token, newToken);
         assertNotNull(newToken);
-    }
-    
-    public static void main(String args[]) {
-
     }
 }

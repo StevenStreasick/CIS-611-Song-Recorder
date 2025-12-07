@@ -1,6 +1,8 @@
 package songs;
 
 import java.util.LinkedHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 import org.apache.http.HttpResponse;
@@ -26,10 +28,9 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 
 import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
 
 public class StreamerSonglistAPI extends FileWriter implements StreamerSonglistAPIInterface {
-	final final static CloseableHttpClient httpclient = HttpClientSingleton.HTTPCLIENT;
+	final static CloseableHttpClient httpclient = HttpClientSingleton.HTTPCLIENT;
 
 	private final ExecutorService executor = Executors.newSingleThreadExecutor(); 
 
@@ -43,6 +44,8 @@ public class StreamerSonglistAPI extends FileWriter implements StreamerSonglistA
 	
 	private String broadcaster = null; 
 	private int broadcasterID = -1;
+	
+	Socket socket;
 
 	public StreamerSonglistAPI(String streamerName) throws IllegalArgumentException {
 		if(streamerName == null || streamerName.isBlank()) {
@@ -51,8 +54,6 @@ public class StreamerSonglistAPI extends FileWriter implements StreamerSonglistA
 		broadcaster = streamerName.toLowerCase();
 		
 		setBroadcasterID(broadcaster);
-
-		listenForUpdates();
 	}
 	
 	private int setBroadcasterID(String streamerName) throws IllegalArgumentException {
@@ -88,7 +89,7 @@ public class StreamerSonglistAPI extends FileWriter implements StreamerSonglistA
 		return -1;
 	}
 	
-	private void listenForUpdates() {
+	public void listenForUpdates() {
 		try {
 			if(broadcasterID == -1) {
 				throw new IllegalArgumentException("Broadcaster ID is invalid");
@@ -100,7 +101,7 @@ public class StreamerSonglistAPI extends FileWriter implements StreamerSonglistA
 			options.reconnection = true; // Enable reconnection attempts
 			options.timeout = 5000; // 5 seconds timeout
 
-			Socket socket = IO.socket(SOCKET_URI, options);
+			socket = IO.socket(SOCKET_URI, options);
 			socket.on(Socket.EVENT_CONNECT_ERROR, args -> {
 				System.err.println("Connection error: " + args[0]);
 			});
@@ -136,6 +137,23 @@ public class StreamerSonglistAPI extends FileWriter implements StreamerSonglistA
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+	public void stopListening() { 
+		try { 
+			if (socket == null) return; 
+			
+			socket.off("new-playhistory"); 
+			socket.off(Socket.EVENT_CONNECT); 
+			socket.off(Socket.EVENT_CONNECT_ERROR); 
+			socket.off(Socket.EVENT_DISCONNECT);
+			socket.disconnect(); 
+			socket.close(); 
+
+		} catch (Exception e) { 
+			e.printStackTrace(); 
+		} finally { 
+			socket = null; 
+		} 
 	}
 	
 	private Instant convertStringToInstant(String timeString) {
@@ -266,14 +284,18 @@ public class StreamerSonglistAPI extends FileWriter implements StreamerSonglistA
 	        .collect(Collectors.joining("\n"));
 			
 			super.writeToFile(result);
-			
-			songlist.clear();
-			
+						
 			return true;
 		} catch(Exception e) {
 			System.out.println(e);
 		}
 		return false;
+	}
+
+	public boolean clearSonglist() {
+		songlist.clear();
+
+		return true;
 	}
 
 }

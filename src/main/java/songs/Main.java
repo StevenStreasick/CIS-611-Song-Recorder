@@ -1,8 +1,5 @@
 package songs;
 
-import java.awt.Desktop;
-import java.net.URISyntaxException;
-
 public class Main implements StreamObserver {
 	
 //	private static final String streamerName = "LizKayTv";
@@ -36,25 +33,28 @@ public class Main implements StreamObserver {
 		System.out.println("Stream is starting at " + startTime);
 		songlistAPI = new StreamerSonglistAPI(streamerName);
 		songlistAPI.setStartTime(startTime);
+		songlistAPI.listenForUpdates();
 	}
 	
 	@Override
 	public void onStreamEnd() {
-		//Do stuff here to handle a 'restart'
 		System.out.println("Stream finished");
 
 		try {
+
 			songlistAPI.writeSonglistToFile();
+			songlistAPI.stopListening();
+			songlistAPI.clearSonglist();
+
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-//		listenForStreamEvents();
 	}
 	
 	public static void main(String[] args) {
 		try {
-			Main main = new Main();
+			new Main();
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

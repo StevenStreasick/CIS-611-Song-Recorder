@@ -1,11 +1,10 @@
 package songs;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-
 import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
@@ -28,11 +27,15 @@ public class TwitchAPI extends WebClient {
 	//DO NOT CHANGE THE VALUES BELOW
 	
 	final static CloseableHttpClient httpclient = HttpClientSingleton.HTTPCLIENT;
+    private static final int PORT = 8060;
+
 
 	private String startTime = null;
 	private int streamerID = -1;
 	
 	private String sessionId = "";
+	
+	private static String redirectUri = "http://localhost:" + PORT + "/callback";
 	
 //	private Instant expirationTime = null;
 	
@@ -61,6 +64,7 @@ public class TwitchAPI extends WebClient {
     }
 
     private void notifyStreamEnded() {
+    	startTime = null;
         for (StreamObserver obs : observers) {
             obs.onStreamEnd();
         }
@@ -68,16 +72,16 @@ public class TwitchAPI extends WebClient {
 
 	private boolean isBroadcasterValid(String streamerName) {
 		//TODO: Complete this method
+//		https://api.twitch.tv/helix/users?login=<username>
 		return true;
 	}
 	
-	public TwitchAPI(String streamerName) throws URISyntaxException {
-		this(streamerName, new ClientInfo());
+	public TwitchAPI(String streamerName) throws URISyntaxException, IOException {
+		this(redirectUri, streamerName, new ClientInfo());
 	}
 
-	public TwitchAPI(String streamerName, ClientInfo clientInfo) throws URISyntaxException {
+	public TwitchAPI(String redirectUri, String streamerName, ClientInfo clientInfo) throws URISyntaxException, IOException {
 		super(new URI(TWITCHURI), TOKENFILENAME, clientInfo);
-
 		try {
 			
 			if (streamerName == null || streamerName.isBlank()) {
@@ -90,6 +94,11 @@ public class TwitchAPI extends WebClient {
 
 			broadcaster = streamerName;
 			
+//			startCallbackServer();
+//	        fetchAppToken();
+//	        subscribe("stream.online");
+//	        subscribe("stream.offline");
+		   
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -259,7 +268,7 @@ public class TwitchAPI extends WebClient {
 		
 		return true;
 	}
-
+	
 	private boolean handleReconnect(JSONObject reconnectResponse) {
 
 		//TODO: Fill this information out
@@ -278,12 +287,9 @@ public class TwitchAPI extends WebClient {
 		if (reconnectUrl != null && !reconnectUrl.isEmpty()) {
 			System.out.println("Reconnecting to: " + reconnectUrl);
 			try {
-				this.close(); // Close the current connection
 				 URI reconnectUri = new URI(reconnectUrl);
 				 
 		        super.updateURI(reconnectUri);
-		        this.reconnectBlocking();
-				 // Establish the new connection
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
@@ -335,7 +341,7 @@ public class TwitchAPI extends WebClient {
 			// Construct the subscription message for stream.online event
 
 			JSONObject condition = new JSONObject();
-			condition.put("broadcaster_user_id", streamerID); 
+			condition.put("broadcaster_user_id", Integer.toString(streamerID)); 
 			
 			JSONObject transport = new JSONObject();
 			transport.put("method", "websocket");
@@ -345,7 +351,7 @@ public class TwitchAPI extends WebClient {
 			eventSub.put("condition", condition);
 			eventSub.put("transport", transport);
 			eventSub.put("type", event);
-			eventSub.put("version", "-1");
+			eventSub.put("version", "1");
 
 			// Send the subscription message to Twitch
 			// Post to https://api.twitch.tv/helix/eventsub/subscriptions
@@ -373,12 +379,14 @@ public class TwitchAPI extends WebClient {
 				throw new Exception("Server declined to subscribe to event");
 			}
 			
+			System.out.println("Subscribed to event " + event);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 
 		return false;
 	}
+	
 	
 	private boolean handleWelcome(JSONObject jsonMessage) {
 		boolean parsedID = parseForID(jsonMessage);
@@ -439,9 +447,12 @@ public class TwitchAPI extends WebClient {
 		if (createdAt == null || createdAt.isEmpty()) {
 			return;
 		}
-		//TODO: Somehow I need to get Twitch's start time
+		
 		if (type.equalsIgnoreCase("stream.online")) {
+			
+			startTime = createdAt;
 			notifyStreamWentLive();
+			
 		}
 
 		if (type.equals("stream.offline")) {
@@ -452,4 +463,6 @@ public class TwitchAPI extends WebClient {
 	public String getStartTime() {
 		return startTime;
 	}
+	
+	
 }

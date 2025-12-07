@@ -1,10 +1,12 @@
 package songs;
 
+import java.awt.Desktop;
 import java.net.URISyntaxException;
 
 public class Main implements StreamObserver {
 	
-	private static final String streamerName = "CERIANMusic";
+//	private static final String streamerName = "LizKayTv";
+	private static final String streamerName = "JenniferJess";
 
 	String clientId = System.getenv("TWITCH_CLIENT_ID");
 	String clientSecret = System.getenv("TWITCH_CLIENT_SECRET");
@@ -18,9 +20,11 @@ public class Main implements StreamObserver {
 			
 			twitchAPI.clientInfo.setClientId(clientId);
 			twitchAPI.clientInfo.setClientSecret(clientSecret);
-			
-			System.out.println("Adding as observer");
+//			
+//			System.out.println("Adding as observer");
 			twitchAPI.addObserver(this);
+			
+			twitchAPI.connect();
 			
 		} catch(Exception e) {
 			
@@ -37,6 +41,8 @@ public class Main implements StreamObserver {
 	@Override
 	public void onStreamEnd() {
 		//Do stuff here to handle a 'restart'
+		System.out.println("Stream finished");
+
 		try {
 			songlistAPI.writeSonglistToFile();
 		} catch (Exception e) {
@@ -49,13 +55,6 @@ public class Main implements StreamObserver {
 	public static void main(String[] args) {
 		try {
 			Main main = new Main();
-			
-//			TokenManager manager = new TokenManager("tokens.txt");
-
-			
-			//TokenManager(String fileName)
-	        Thread.currentThread().join(); // Wait indefinitely
-			
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

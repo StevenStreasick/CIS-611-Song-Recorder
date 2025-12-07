@@ -29,7 +29,9 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 
 public class StreamerSonglistAPI extends FileWriter implements StreamerSonglistAPIInterface {
-	final static CloseableHttpClient httpclient = HttpClientSingleton.HTTPCLIENT;
+	final final static CloseableHttpClient httpclient = HttpClientSingleton.HTTPCLIENT;
+
+	private final ExecutorService executor = Executors.newSingleThreadExecutor(); 
 
 	private static final String SOCKET_URI = "https://api.streamersonglist.com";
 	private static final String API_PREFIX = "https://api.streamersonglist.com/v1/streamers";
@@ -37,6 +39,7 @@ public class StreamerSonglistAPI extends FileWriter implements StreamerSonglistA
 
 	private LinkedHashMap<String, Duration> songlist = new LinkedHashMap<String, Duration>();
 	private Instant startTime = null; 
+	private String previousPlayedAt = null;
 	
 	private String broadcaster = null; 
 	private int broadcasterID = -1;
@@ -48,7 +51,6 @@ public class StreamerSonglistAPI extends FileWriter implements StreamerSonglistA
 		broadcaster = streamerName.toLowerCase();
 		
 		setBroadcasterID(broadcaster);
-		System.out.println("Constructor called");
 
 		listenForUpdates();
 	}
@@ -104,13 +106,13 @@ public class StreamerSonglistAPI extends FileWriter implements StreamerSonglistA
 			});
 
 			socket.on(Socket.EVENT_DISCONNECT, args -> {
-				System.out.println("Disconnected from server: " + args[0]);
+				System.out.println("Disconnected from Songlist server: " + args[0]);
 			});
 			// Event: When connected
 			socket.on(Socket.EVENT_CONNECT, new Emitter.Listener() {
 				@Override
 				public void call(Object... args) {
-					System.out.println("Connected to server");
+					System.out.println("Connected to Songlist server");
 
 					// Emit the 'join-room' event with the streamer ID
 					socket.emit("join-room", broadcasterID);
@@ -123,12 +125,12 @@ public class StreamerSonglistAPI extends FileWriter implements StreamerSonglistA
 				@Override
 				public void call(Object... args) {
 
-					updateSonglist();
+					executor.submit(() -> { updateSonglist(); });
 				}
 			});
 
 			// Connect to the server
-			System.out.println("Connecting Socket");
+			System.out.println("Connecting Songlist Socket");
 			socket.connect();
 
 		} catch (Exception e) {
@@ -182,6 +184,7 @@ public class StreamerSonglistAPI extends FileWriter implements StreamerSonglistA
 					continue;
 				}
 				
+				
 				String playedAt = songInfo.optString("playedAt");
 
 				Instant playedAtInstant = convertStringToInstant(playedAt);
@@ -194,13 +197,11 @@ public class StreamerSonglistAPI extends FileWriter implements StreamerSonglistA
 				
 				System.out.printf("%s: %s%n", playedAtInstant, songTitle);
 				songlist.put(songTitle, timeElapsed);
-				
+								
 				if(i == songs.length() - 1) {
 					updateSonglist(current + 1);
 				}
 			}
-
-
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -213,7 +214,7 @@ public class StreamerSonglistAPI extends FileWriter implements StreamerSonglistA
 	public boolean setStartTime(String startTimeString) {
 		try {
 			startTime = convertStringToInstant(startTimeString);
-			
+
 			DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm-ss")
 					.withZone(ZoneId.of("UTC"));
 			
@@ -251,14 +252,22 @@ public class StreamerSonglistAPI extends FileWriter implements StreamerSonglistA
 	        .map(e -> {
 	            Duration value = e.getValue();
 	            long seconds = value.getSeconds();
+	            LocalTime currentTime = LocalTime.ofSecondOfDay(seconds);
+	            
+	            String currentTimeString = currentTime.format(formatter);
 	
-	            LocalTime time = LocalTime.ofSecondOfDay(seconds);
-	
-	            return String.format("%s: %s", e.getKey(), time.format(formatter));
+	            if(previousPlayedAt == null || previousPlayedAt.isBlank()) {
+	            	previousPlayedAt = formatter.format(startTime);
+	            }
+	            String returnVal = String.format("%s: %s", e.getKey(), previousPlayedAt);
+            	previousPlayedAt = currentTimeString;
+	            return returnVal;
 	        })
 	        .collect(Collectors.joining("\n"));
 			
 			super.writeToFile(result);
+			
+			songlist.clear();
 			
 			return true;
 		} catch(Exception e) {

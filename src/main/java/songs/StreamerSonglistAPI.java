@@ -29,8 +29,8 @@ import java.time.format.DateTimeFormatter;
 
 import org.apache.http.impl.client.CloseableHttpClient;
 
-public class StreamerSonglistAPI extends FileWriter implements StreamerSonglistAPIInterface {
-	final static CloseableHttpClient httpclient = HttpClientSingleton.HTTPCLIENT;
+public class StreamerSonglistAPI extends FileWriter {
+	final CloseableHttpClient httpclient = HttpClientSingleton.getInstance();
 
 	private final ExecutorService executor = Executors.newSingleThreadExecutor(); 
 
@@ -64,6 +64,7 @@ public class StreamerSonglistAPI extends FileWriter implements StreamerSonglistA
 			HttpResponse response = httpclient.execute(get);
 			
 			StatusLine status = response.getStatusLine();
+			System.out.println(status.getStatusCode());
 			if(status.getStatusCode() == 400) {
 				throw new IllegalArgumentException("The provided broadcaster is not found in streamersonglist");
 			}

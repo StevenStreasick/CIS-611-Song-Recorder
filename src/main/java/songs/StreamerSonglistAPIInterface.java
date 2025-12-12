@@ -1,8 +1,0 @@
-package songs;
-
-
-
-
-interface StreamerSonglistAPIInterface {
-	
-}

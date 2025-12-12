@@ -27,6 +27,10 @@ public class WebClient {
             throw new IllegalArgumentException(); 
         }
 		
+		if(clientInfo == null) {
+			throw new IllegalArgumentException("ClientInfo can not be null");
+		}
+		
 		this.clientInfo = clientInfo;
 		this.callbackServer = callbackServer;
 		

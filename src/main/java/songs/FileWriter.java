@@ -31,7 +31,7 @@ abstract class FileWriter {
 					StandardOpenOption.TRUNCATE_EXISTING);
 			return true;
 		} catch (IOException e) {
-			System.err.println("Error writing to file: " + e.getMessage());
+			System.err.println("Error writing to file: " + e.getStackTrace());
 			return false;
 		}
 	}
@@ -44,7 +44,7 @@ abstract class FileWriter {
 			List<String> lines = Files.readAllLines(filePath);
 			return lines; 
 		} catch (IOException e) {
-			System.err.println("Error reading from file: " + e.getMessage());
+			System.err.println("Error reading from file: " + e.getStackTrace());
 			return null;
 		}
 	}

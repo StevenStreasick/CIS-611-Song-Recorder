@@ -41,7 +41,7 @@ import com.sun.net.httpserver.HttpServer;
 import songs.CallbackServer.OAuthCallbackListener;
 
 public class TokenManager extends FileWriter implements OAuthCallbackListener {
-	private final CloseableHttpClient httpclient = HttpClientSingleton.HTTPCLIENT;
+	private final CloseableHttpClient httpclient = HttpClientSingleton.getInstance();
 
 	private final Path filePath;
 	

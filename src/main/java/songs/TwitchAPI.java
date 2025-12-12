@@ -26,7 +26,7 @@ public class TwitchAPI extends WebClient {
 	
 	//DO NOT CHANGE THE VALUES BELOW
 	
-	final static CloseableHttpClient httpclient = HttpClientSingleton.HTTPCLIENT;
+	final static CloseableHttpClient httpclient = HttpClientSingleton.getInstance();
     private static final int PORT = 8060;
 
 
@@ -69,12 +69,6 @@ public class TwitchAPI extends WebClient {
             obs.onStreamEnd();
         }
     }
-
-	private boolean isBroadcasterValid(String streamerName) {
-		//TODO: Complete this method
-//		https://api.twitch.tv/helix/users?login=<username>
-		return true;
-	}
 	
 	public TwitchAPI(String streamerName) throws URISyntaxException, IOException {
 		this(redirectUri, streamerName, new ClientInfo());
@@ -82,26 +76,17 @@ public class TwitchAPI extends WebClient {
 
 	public TwitchAPI(String redirectUri, String streamerName, ClientInfo clientInfo) throws URISyntaxException, IOException {
 		super(new URI(TWITCHURI), TOKENFILENAME, clientInfo);
-		try {
-			
-			if (streamerName == null || streamerName.isBlank()) {
-				throw new IllegalArgumentException("The broadcaster must be supplied");
-			}
-			
-			if (!isBroadcasterValid(streamerName)) {
-				throw new IllegalArgumentException("The broadcaster is not a valid Twitch username");
-			}
-
-			broadcaster = streamerName;
-			
+		
+		if (streamerName == null || streamerName.isBlank()) {
+			throw new IllegalArgumentException("The broadcaster must be supplied");
+		}
+		
+		broadcaster = streamerName;
+		
 //			startCallbackServer();
 //	        fetchAppToken();
 //	        subscribe("stream.online");
 //	        subscribe("stream.offline");
-		   
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
 	}
 
 	private int getStreamerID() {

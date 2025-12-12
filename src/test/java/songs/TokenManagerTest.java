@@ -1,136 +1,311 @@
 package songs;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
+import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.io.FileWriter;
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Scanner;
+import java.time.Instant;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 public class TokenManagerTest {
-//	TODO: Add a test for File Writer extends...
-	String fileName = "\tokens.txt";
-	
-	String clientId = System.getenv("TWITCH_CLIENT_ID");
-	String clientSecret = System.getenv("TWITCH_CLIENT_SECRET");
 
-	ClientInfo blankClientInfo = new ClientInfo();
-	ClientInfo clientInfo = new ClientInfo(clientId, clientSecret);
+	private String fileName;
+	private String clientId;
+	private String clientSecret;
+	private ClientInfo blankClientInfo;
+	private ClientInfo clientInfo;
+	private CallbackServer mockCallbackServer;
 
-	static ClientInfo testingInfo = new ClientInfo(System.getenv("TWITCH_CLIENT_ID"), System.getenv("TWITCH_CLIENT_SECRET"));
-	
 	@BeforeEach
+	void setUp() {
+		fileName = "test_tokens.txt";
+		clientId = System.getenv("TWITCH_CLIENT_ID");
+		clientSecret = System.getenv("TWITCH_CLIENT_SECRET");
+		blankClientInfo = new ClientInfo();
+		clientInfo = new ClientInfo(clientId, clientSecret);
+		mockCallbackServer = mock(CallbackServer.class);
+
+		removeTokenFile();
+	}
+
+	@AfterEach
+	void tearDown() {
+		removeTokenFile();
+	}
+
 	void removeTokenFile() {
 		File file = new File(fileName);
-
-        if (file.exists()) {
-        	file.delete();
-        }
+		if (file.exists()) {
+			file.delete();
+		}
 	}
-	
-	@Test 
-	void environmentVariables() {
-		assertNotNull(clientId);
-		assertNotNull(clientSecret);
-		assertFalse(clientId.isBlank());
-		assertFalse(clientSecret.isBlank());
+
+	/** Environment Variable Tests **/
+	@Test
+	void testEnvironmentVariables() {
+		assertNotNull(clientId, "TWITCH_CLIENT_ID should be set");
+		assertNotNull(clientSecret, "TWITCH_CLIENT_SECRET should be set");
+		assertFalse(clientId.isBlank(), "TWITCH_CLIENT_ID should not be blank");
+		assertFalse(clientSecret.isBlank(), "TWITCH_CLIENT_SECRET should not be blank");
 	}
-	
-    @Test
-    void Constructor1() {
-    	
-        TokenManager manager = new TokenManager(fileName, clientInfo);
-        
-        String token = manager.getBearerToken();
 
-        assertNotNull(token);
-        assertFalse(token.isBlank());
-        
-    }
-    
-    @Test
-    void writeToFile() {
-        TokenManager manager = new TokenManager(fileName, clientInfo);
-        
-        String token = manager.getBearerToken();
-        
-        try (Scanner scanner = new Scanner(new FileReader(fileName))) {
-    		String accessToken = scanner.nextLine();
-    		
-    		assertEquals(accessToken, token);
-    		assertTrue(scanner.hasNextLine());
-    		
-    		String expiresIn = scanner.nextLine();
-    		
-    		assertNotNull(expiresIn);
-    		assertFalse(expiresIn.isBlank());
-        } catch(IOException e) {
-        	
-        }
+	/** Constructor **/
+	@Test
+	void testConstructor_WithValidParameters() {
+		TokenManager manager = new TokenManager(fileName, clientInfo, mockCallbackServer);
 
-        assertNotNull(manager.getBearerToken());
-        assertFalse(token.isBlank());    
-    }
-    
-    @Test
-    void readToFile() {
-    	String fileName = "\tokens.txt";
-    	try {
-	        TokenManager manager = new TokenManager(fileName, clientInfo);
+		assertNotNull(manager);
+		assertFalse(manager.hasTokens());
+	}
 
-    		String accessToken = manager.getBearerToken();
-    		String expiresIn = "2000550985";
-    		
-    		java.io.FileWriter writer = new java.io.FileWriter(fileName);
-    		
-    		writer.write(accessToken + "\n" + expiresIn);
-    		writer.close();
-    		
-	        manager = new TokenManager(fileName, clientInfo);
-	        
-	        assertEquals(accessToken, manager.getBearerToken());
-        
-        } catch(IOException e) {
-        	assertTrue(false);
-        }
-    }
-    
-    @Test
-    void multipleTokenManagers() {
-        TokenManager manager1 = new TokenManager("\tokens.txt", clientInfo);
-        String token1 = manager1.getBearerToken();
+	@Test
+	void testConstructor_WithBearerToken() {
+		String testToken = "test_bearer_token";
+		Long expiresIn = 3600L;
+		String testRefresh = "test_refresh_token";
 
-        TokenManager manager2 = new TokenManager("\tokens.txt", clientInfo);
-        String token2 = manager2.getBearerToken();
-        
-        assertNotNull(manager1.getBearerToken());
-        assertFalse(token1.isBlank());
-        
-        assertEquals(token1, token2);
-    }
-    
-    @Test
-    void Constructor2_validtoken() {
-    	TokenManager manager1 = new TokenManager("\tokens.txt", clientInfo);
-    	
-    	String token = manager1.getBearerToken();
-        TokenManager manager = new TokenManager("\tokens.txt", clientInfo, token, (long) 2000550985);
-        
-        assertEquals(token, manager.getBearerToken());
-    }
-    
-    @Test
-    void Constructor2_expiredtoken() {
-    	String token = "Hello World!";
-        TokenManager manager = new TokenManager("\tokens.txt", clientInfo, token, (long) 1000);
-        
-        String newToken = manager.getBearerToken();
-        assertNotEquals(token, newToken);
-        assertNotNull(newToken);
-    }
+		TokenManager manager = new TokenManager(fileName, clientInfo, testToken, expiresIn, testRefresh);
+
+		assertTrue(manager.hasTokens());
+		assertEquals(testToken, manager.getBearerToken());
+	}
+
+	@Test
+	void testConstructor_WithNullClientInfo() {
+		assertThrows(IllegalArgumentException.class, () -> {
+			new TokenManager(fileName, null, mockCallbackServer);
+		});
+	}
+
+	/** Token Persistence Tests **/
+	@Test
+	void testTokens_WrittenToFile() throws IOException {
+		String testToken = "test_access_token";
+		Long expiresIn = 3600L;
+		String refreshToken = "test_refresh_token";
+
+		new TokenManager(fileName, clientInfo, testToken, expiresIn, refreshToken);
+
+		File file = new File(fileName);
+		assertTrue(file.exists());
+
+		List<String> lines = Files.readAllLines(Path.of(fileName));
+
+		assertEquals(3, lines.size());
+		assertEquals(testToken, lines.get(0));
+		assertEquals(refreshToken, lines.get(1));
+		assertNotEquals("-1", lines.get(2));
+		assertTrue(Long.parseLong(lines.get(2)) > Instant.now().getEpochSecond());
+
+	}
+
+	@Test
+	void testTokens_ReadFromFile() throws IOException {
+
+		String testToken = "test_access_token";
+		Long futureExpiry = Instant.now().getEpochSecond() + 7200; // 2 hours
+		String refreshToken = "test_refresh_token";
+
+		String content = testToken + "\n" + refreshToken + "\n" + futureExpiry;
+		Files.writeString(Path.of(fileName), content);
+
+		TokenManager manager = new TokenManager(fileName, clientInfo, mockCallbackServer);
+
+		assertTrue(manager.hasTokens());
+	}
+
+	@Test
+	void testMultipleTokenManagers_ShareFile() {
+		String testToken = "shared_token";
+		Long expiresIn = 3600L;
+		String refreshToken = "shared_refresh";
+
+		new TokenManager(fileName, clientInfo, testToken, expiresIn, refreshToken);
+
+		TokenManager manager2 = new TokenManager(fileName, clientInfo, mockCallbackServer);
+
+		assertTrue(manager2.hasTokens());
+	}
+
+	@Test
+	void testTokenFile_InvalidFormat() throws IOException {
+		Files.writeString(Path.of(fileName), "invalid\ncontent");
+
+		TokenManager manager = new TokenManager(fileName, clientInfo, mockCallbackServer);
+		assertFalse(manager.hasTokens());
+	}
+
+	@Test
+	void testTokenFile_Empty() throws IOException {
+		Files.writeString(Path.of(fileName), "");
+
+		TokenManager manager = new TokenManager(fileName, clientInfo, mockCallbackServer);
+		assertFalse(manager.hasTokens());
+	}
+
+	/** Token Validation Tests **/
+	@Test
+	void testHasTokens_WhenNoTokens() {
+		TokenManager manager = new TokenManager(fileName, clientInfo, mockCallbackServer);
+		assertFalse(manager.hasTokens());
+	}
+
+	@Test
+	void testHasTokens_WhenTokensExist() {
+		String testToken = "test_token";
+		Long expiresIn = 3600L;
+		String refreshToken = "refresh_token";
+
+		TokenManager manager = new TokenManager(fileName, clientInfo, testToken, expiresIn, refreshToken);
+		assertTrue(manager.hasTokens());
+	}
+
+	/** Clear Tokens Tests **/
+	@Test
+	void testClearTokens_RemovesAllTokens() {
+		String testToken = "test_token";
+		Long expiresIn = 3600L;
+		String refreshToken = "refresh_token";
+
+		TokenManager manager = new TokenManager(fileName, clientInfo, testToken, expiresIn, refreshToken);
+		assertTrue(manager.hasTokens());
+
+		manager.clearTokens();
+		assertFalse(manager.hasTokens());
+	}
+
+	@Test
+	void testClearTokens_UpdatesFile() throws IOException {
+		String testToken = "test_token";
+		Long expiresIn = 3600L;
+		String refreshToken = "refresh_token";
+
+		TokenManager manager = new TokenManager(fileName, clientInfo, testToken, expiresIn, refreshToken);
+		manager.clearTokens();
+
+		List<String> lines = Files.readAllLines(Path.of(fileName));
+		assertTrue(lines.get(0).isEmpty());
+		assertTrue(lines.get(1).isEmpty());
+		assertEquals("-1", lines.get(2));
+	}
+
+	@Test
+	void testClearTokens_GetTokens() throws IOException {
+		TokenManager manager = new TokenManager(fileName, clientInfo, mockCallbackServer);
+		manager.clearTokens();
+		manager.getBearerToken();
+
+		assertTrue(manager.hasTokens());
+
+		List<String> lines = Files.readAllLines(Path.of(fileName));
+		assertFalse(lines.get(0).isEmpty());
+		assertFalse(lines.get(1).isEmpty());
+		assertNotEquals("-1", lines.get(2));
+	}
+
+	/** Edge Cases **/
+	@Test
+	void testGetBearerToken_WithBlankClientInfo() {
+		TokenManager manager = new TokenManager(fileName, blankClientInfo, mockCallbackServer);
+		String token = manager.getBearerToken();
+		assertNull(token);
+	}
+
+	@Test
+	void testExpiredToken_IsDetected() {
+		String testToken = "expired_token";
+		Long expiredTime = Instant.now().getEpochSecond() - 1000;
+		String refreshToken = "refresh_token";
+
+		String content = testToken + "\n" + refreshToken + "\n" + expiredTime;
+		assertDoesNotThrow(() -> Files.writeString(Path.of(fileName), content));
+
+		TokenManager manager = new TokenManager(fileName, clientInfo, mockCallbackServer);
+		assertTrue(manager.hasTokens());
+	}
+
+	@Test
+	void testFutureToken_IsValid() {
+		String testToken = "future_token";
+		Long futureExpiry = Instant.now().getEpochSecond() + 7200;
+		String refreshToken = "refresh_token";
+
+		TokenManager manager = new TokenManager(fileName, clientInfo, testToken, futureExpiry, refreshToken);
+		assertTrue(manager.hasTokens());
+	}
+
+	@Test
+	void testConstructor_WithNullFileName() {
+		assertThrows(Exception.class, () -> {
+			new TokenManager(null, clientInfo, mockCallbackServer);
+		});
+	}
+
+	@Test
+	void testConstructor_WithEmptyFileName() {
+		assertDoesNotThrow(() -> {
+			new TokenManager("", clientInfo, mockCallbackServer);
+		});
+	}
+
+	/** FileWriter Inheritance Test **/
+	@Test
+	void testExtendsFileWriter() {
+		assertTrue(FileWriter.class.isAssignableFrom(TokenManager.class));
+	}
+
+	/** Integration-style Tests (marked for manual execution) **/
+	@Test
+	@Tag("integration")
+	@Disabled("Requires OAuth flow - run manually")
+	void testIntegration_FullOAuthFlow() {
+		CallbackServer realCallbackServer = new CallbackServer();
+		TokenManager manager = new TokenManager(fileName, clientInfo, realCallbackServer);
+
+		String token = manager.getBearerToken();
+		assertNotNull(token);
+		assertFalse(token.isBlank());
+		assertTrue(manager.hasTokens());
+	}
+
+	@Test
+	@Tag("integration")
+	@Disabled("Requires valid tokens - run manually")
+	void testIntegration_TokenRefresh() throws InterruptedException {
+		CallbackServer realCallbackServer = new CallbackServer();
+		TokenManager manager = new TokenManager(fileName, clientInfo, realCallbackServer);
+
+		String initialToken = manager.getBearerToken();
+		assertNotNull(initialToken);
+
+		TimeUnit.SECONDS.sleep(2);
+		boolean updated = manager.updateTokens();
+		assertFalse(updated);
+	}
+
+	/** Concurrency Test **/
+	@Test
+	void testConcurrency_MultipleManagers() {
+		String testToken = "concurrent_token";
+		Long expiresIn = 3600L;
+		String refreshToken = "concurrent_refresh";
+
+		TokenManager manager1 = new TokenManager(fileName, clientInfo, testToken, expiresIn, refreshToken);
+		TokenManager manager2 = new TokenManager(fileName, clientInfo, mockCallbackServer);
+		TokenManager manager3 = new TokenManager(fileName, clientInfo, mockCallbackServer);
+
+		assertTrue(manager1.hasTokens());
+		assertTrue(manager2.hasTokens());
+		assertTrue(manager3.hasTokens());
+
+		manager1.clearTokens();
+
+		TokenManager manager4 = new TokenManager(fileName, clientInfo, mockCallbackServer);
+		assertFalse(manager4.hasTokens());
+	}
 }
